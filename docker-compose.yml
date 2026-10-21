@@ -1,0 +1,31 @@
+name: parcel-delivery-dev
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: parcel_dev
+      POSTGRES_PASSWORD: parcel_dev_local
+      POSTGRES_DB: parcel_delivery
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parcel_dev -d parcel_delivery"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: parcel_local
+      MINIO_ROOT_PASSWORD: parcel_local_secret_change_me
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio_data:/data
+volumes:
+  postgres_data:
+  minio_data:

@@ -1,0 +1,8 @@
+@import "tailwindcss";
+:root { --background: #f5f7fb; --foreground: #17233b; }
+* { box-sizing: border-box; }
+body { background: var(--background); color: var(--foreground); font-family: Arial, Helvetica, sans-serif; margin: 0; }
+a, button, input, select { -webkit-tap-highlight-color: transparent; }
+button, a, input, select { outline-offset: 4px; }
+button:enabled { cursor: pointer; }
+::selection { background: #d6e3ff; }

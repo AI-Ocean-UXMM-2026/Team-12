@@ -1,0 +1,2 @@
+import { WorkflowPlaceholder } from "@/components/workflow-placeholder";
+export default function Page() { return <WorkflowPlaceholder title="My daily deliveries" tasks={["Authenticate the Rider and filter assignments by delivery date and parcel code.", "Show contact-copy action, latest receiving preference and instructions.", "Add authorized delivery results, private photo upload and retryable attempts."]}/>; }

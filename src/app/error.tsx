@@ -1,0 +1,2 @@
+"use client";
+export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {return <main className="mx-auto max-w-xl p-10"><h1 className="text-2xl font-semibold">Unable to load this screen</h1><p className="my-4">Try again. If the issue persists, check the server logs.</p><button onClick={reset} className="rounded-lg bg-blue-600 px-4 py-2 text-white">Try again</button></main>;}
