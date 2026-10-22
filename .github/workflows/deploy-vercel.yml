@@ -1,0 +1,90 @@
+name: Deploy to Vercel
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Require Vercel connection
+        shell: bash
+        run: |
+          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Set $key in GitHub repository or production environment secrets. See docs/VERCEL.md."
+              exit 1
+            fi
+          done
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Vercel CLI
+        run: npm install --global vercel@65.0.0
+      - name: Pull production project settings
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Mask downloaded environment values
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { parse } from 'dotenv';
+          for (const value of Object.values(parse(readFileSync('.vercel/.env.production.local')))) {
+            if (value) console.log('::add-mask::' + value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A'));
+          }
+          NODE
+      - name: Validate production configuration
+        env:
+          NODE_ENV: production
+        run: node --env-file=.vercel/.env.production.local --import tsx --input-type=module -e "const {validateConfig}=await import('./src/lib/config.ts'); validateConfig();"
+      - name: Build production deployment
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+      - name: Apply committed database migrations
+        run: node --env-file=.vercel/.env.production.local node_modules/prisma/build/index.js migrate deploy
+      - name: Check hosted database and private storage
+        env:
+          NODE_ENV: production
+        run: |
+          node --env-file=.vercel/.env.production.local --conditions=react-server --import tsx --input-type=module <<'NODE'
+          const { getDb } = await import('./src/lib/db.ts');
+          const { getPrivateStore } = await import('./src/lib/storage.ts');
+          const db = getDb();
+          try {
+            await db.$queryRaw`SELECT 1`;
+            await getPrivateStore().ready();
+          } finally {
+            await db.$disconnect();
+          }
+          NODE
+      - name: Deploy production build
+        id: deployment
+        run: |
+          deployment_url=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "### Vercel production deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "$deployment_url" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify deployed readiness
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.url }}
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 \
+            -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+            "$DEPLOYMENT_URL/api/ready"

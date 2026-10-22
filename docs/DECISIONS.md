@@ -92,3 +92,5 @@ Official implementation references consulted: [Next.js installation](https://nex
 - `next dev` appended its own framework instruction block to AGENTS.md; the original owner instructions were preserved. Installed Next.js route/cookie/instrumentation guides were consulted for API integration.
 
 Navigation follow-up, 2026-10-22: removed the legacy cross-role menu entirely. AppShell is Admin-only with a server-side role check; it exposes Riders, Parcels and Assignments only. RiderShell remains My Deliveries, notification bell and Sign out, following the owner's restricted Rider navigation requirement.
+
+2026-10-22 owner update: authorize Vercel deployment via GitHub Actions, superseding the previous no-public-deployment restriction for this request. Production deploy follows main-branch checks, never seeds local accounts, and requires independently configured hosted PostgreSQL/S3 and production secrets. Keep SMS disabled. Vercel size limitations are recorded without reducing the 10 MB photo requirement.

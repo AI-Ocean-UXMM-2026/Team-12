@@ -1,5 +1,5 @@
 name: Application checks
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -42,3 +42,10 @@ jobs:
       - run: npm run test:e2e
       - run: npm run test:outbox
       - run: npm run test:maintenance
+  deploy:
+    needs: check
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/deploy-vercel.yml
+    secrets: inherit
+    permissions:
+      contents: read
