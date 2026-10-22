@@ -1,3 +1,1 @@
-# Background worker
-
-Implement the database-backed outbox worker in phase 7. It must claim jobs transactionally, retry transient errors, redact private payloads, and truthfully distinguish local simulation from real SMS delivery. No worker is running or implemented in this scaffold.
+Run `npm run worker:once` from a scheduler to process one durable SMS outbox batch. Disabled by default. Only a redacted, explicitly simulated local adapter exists; real SMS is refused. Claims use PostgreSQL SKIP LOCKED, retry backoff and five-minute leases. Exhausted jobs become FAILED. Run `npm run outbox:retry -- <event-id>` to requeue a failed job. See `docs/OPERATIONS.md` and `npm run test:outbox`.

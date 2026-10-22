@@ -1,4 +1,4 @@
-name: Starter checks
+name: Application checks
 on: [push, pull_request]
 jobs:
   check:
@@ -10,10 +10,35 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run env:local
+      - run: docker compose up -d --wait postgres
+      - run: echo 'STORAGE_ADAPTER=filesystem' >> .env
+      - run: npm run db:deploy
+      - run: npm run storage:init
+      - run: npm run db:seed
       - run: npm run db:validate
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+        env:
+          LOCAL_PRODUCTION_TEST: "true"
+      - name: HTTP security and domain acceptance
+        env:
+          LOCAL_PRODUCTION_TEST: "true"
+          EXPECT_STORAGE: "true"
+        run: |
+          mkdir -p .local
+          node node_modules/next/dist/bin/next start --hostname localhost > .local/http-acceptance.log 2>&1 &
+          parcel_server_pid=$!
+          trap 'kill "$parcel_server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:3000/api/ready > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://localhost:3000/api/ready > /dev/null
+          npm run test:integration
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - run: npm run test:outbox
+      - run: npm run test:maintenance

@@ -1,47 +1,44 @@
 # Implementation progress
 
-Status: runnable code scaffold created. Full product implementation remains incomplete. Check items only after the exit criteria in `IMPLEMENTATION_PLAN.md` are met.
+Updated 2026-10-22. The starter has been extended into operational PostgreSQL-backed workflows. Sample data and placeholder components have been removed. Local proof storage is a private durable filesystem adapter because both official MinIO download hosts were unreachable; S3 code remains implemented but unverified here. This is an explicit environment workaround, not approval of a production architecture change.
 
-- [x] Phase 0 foundation — Next.js/TypeScript/Tailwind scaffold, repository instructions and domain defaults prepared. Codex must still inspect its environment before continuing.
-- [ ] Phase 1 — PostgreSQL/MinIO, schema, migrations, constraints, date/money utilities and synthetic seed data.
-- [ ] Phase 2 — Admin/Rider authentication, credential setup, role/ownership policies and session revocation.
-- [ ] Phase 3 — Rider management and parcel administration, validation and unique codes.
-- [ ] Phase 4 — Assignment create/list/detail, reschedule/reassign, history and concurrency.
-- [ ] Phase 5 — Scoped customer tracking, preferences and transactional notifications.
-- [ ] Phase 6 — Mobile Rider workflows, delivery attempts, secure photos and status mapping.
-- [ ] Phase 7 — Notification center, optional SMS adapter/outbox and truthful local/disabled states.
-- [ ] Phase 8 — Acceptance journeys, security/concurrency tests, build, performance checks and handoff.
-
-## Requirement progress
-
-| Requirement | Implementation | Verification | Status |
-| --- | --- | --- | --- |
-| CUS-01 | Pending | Pending | Not started |
-| CUS-02 | Pending | Pending | Not started |
-| DRV-01 | Pending | Pending | Not started |
-| DRV-02 | Pending | Pending | Not started |
-| ADM-01 | Pending | Pending | Not started |
-| ADM-02 | Pending | Pending | Not started |
-| ADM-03 | Pending | Pending | Not started |
-| Cross-functional | Pending | Pending | Not started |
+| Phase | Implementation and verification state |
+| --- | --- |
+| 0 | Assessed source PRD/tables, plan, decisions, starter code, migrations and tests. Preserved Next.js/React/Prisma versions and npm lockfile. |
+| 1 | Three migrations applied to a fresh real PostgreSQL database; constraints, date helpers, seed with admin/five provisioned Riders/five parcel states and durable private proof implemented. MinIO/S3 integration remains blocked by unavailable Docker and unreachable download hosts. |
+| 2 | Better Auth database sessions, private one-time setup passwords, forced password change, active-account checks, revocation, server roles/ownership, origin checks and PostgreSQL rate limits implemented. HTTP authorization/setup/revocation checks passed. |
+| 3 | Rider search/edit/deactivation/reset and complete parcel fields, money validation, encrypted tracking-code redisplay and create idempotency implemented. HTTP core checks passed. |
+| 4 | Assignment create/list/detail, schedule changes, explicit reassignment, expected dates, immutable history and transactional notifications implemented. Concurrent idempotency/competing updates and former-Rider denial checks passed. |
+| 5 | Bearer-code exchange, scoped 30-minute HttpOnly tracking sessions, private DTO, preferences, no-op handling, terminal lock and notification transactions implemented. HTTP scope/privacy/stale-write checks passed. |
+| 6 | Rider list/detail, filters/copy, unreachable/retry, image decoding/re-encoding, private object storage, result idempotency, proof streaming and cleanup implemented. Full HTTP successful-photo journey passed using filesystem adapter; storage-failure path also passed before fallback was enabled. |
+| 7 | Persisted notification center, unread/read/filter/link behavior and optional disabled/local SMS outbox implemented. Simulated outbox concurrent claiming, retry and lease-recovery checks passed. No real SMS sent. |
+| 8 | Final clean npm install, lint without warnings, strict typecheck, 27 unit tests, expanded HTTP journeys, two browser journeys, simulated outbox, production build/smoke, staged-photo cleanup and PostgreSQL restart persistence passed. Owner-requested 100-parcel/20-reader benchmark passed. Production MinIO/S3, backup/restore and hosted HTTPS verification remain external work. |
 
 ## Work log
 
-Add an entry after each phase or meaningful checkpoint with files changed, checks executed, outcome, blockers and next work. Scaffold checks have run; see the verification record below and `docs/ACCEPTANCE.md`.
+- Rider navigation clarification: traced mixed navigation to Admin-session redirects from Rider URLs. Replaced that redirect with a Rider-account prompt, preserved the isolated Rider navigation, and made the Rider delivery-list API always apply the selected/default business date and authenticated Rider scope. Passed lint, typecheck, build, all four browser tests and the HTTP suite, including wrong-account navigation, selected-date empty/list checks and two-Rider/forged-filter isolation. Rebuilt app is running on localhost.
 
-## Current blockers
+- Customer/Rider separation: introduced dedicated customer and Rider page shells, made `/` the tracking entry, removed cross-workspace navigation from customer/Rider/authentication screens, and kept existing Admin pages for the later pass requested by the owner. Rider navigation contains My Deliveries and an accessible bell; result submission is labeled Submit. Notification cards name all required fields; option-change and instruction-only messages are distinct. Passed lint, strict typecheck, 27 unit tests, production build/smoke, all three browser tests and the HTTP regression suite. Browser coverage confirms public isolation, invalid codes, Rider-only navigation, notification filters/read state and contact copy alongside delivery journeys. Rebuilt app is running on localhost.
 
-None for preparing the specification. Runtime/network/service constraints must be evaluated by Codex in its implementation environment. Production provider configuration and owner-confirmation items are recorded in the decision register.
+- Owner changed tracking to use parcel codes for customers and Admins with no SMS requirement. Updated customer lookup/form, Admin code copy/details, and regression journeys. Removed SMS enqueueing from parcel creation and separate-token/SMS status UI. Scoped sessions and operational authorization remain enforced. Follow-up verification passed: TypeScript, ESLint, production build, two browser journeys, full HTTP regression suite and 27 unit tests. Rebuilt app restarted on localhost; existing parcel codes need no migration.
 
-## Existing scaffold
+- Owner revised the benchmark dataset to 100 parcels. Confirmed the interrupted larger command created none; the revised script created exactly 100 benchmark parcels and retained existing acceptance fixtures. With 20 concurrent readers, tracking p95 was 236 ms and assignment-list p95 392 ms on the production-mode local app. Production build passed; final browser/persistence checks continue.
 
-Implemented: shared layouts and routes, synthetic filtered Rider table, initial Prisma models/SQL migration, PostgreSQL/MinIO Compose, database/storage factories, date/status/photo helpers, Rider validation, five-profile seed, liveness, Vitest/Playwright setup and CI.
+- Initial inspection: starter used public synthetic screens. Existing 13 domain tests passed after installing compatible Node. `npm` PowerShell wrapper was blocked by execution policy; used `npm.cmd`. First install was blocked by npm cache sandbox permissions, then Prisma rejected system Node 22.11. Downloaded Node 24.22 under ignored `.local`, reran clean install and preserved the app root and npm lockfile. Added Better Auth 1.7.12 and sharp; no application reinitialization.
+- Infrastructure: Docker/psql absent from PATH. Downloaded real PostgreSQL binaries into ignored `.local`, initialized a development-only loopback cluster and applied initial/auth migrations. Windows token restrictions required permission to start the server. Added and applied evidence relationship/append-only constraints. No production data was reset.
+- Authentication and operations: added shared server policies/services and guarded API handlers before connecting operational screens. Initial HTTP runs exposed password-change cookie propagation and PostgreSQL advisory-lock result typing; fixed with Better Auth's Next cookie plugin and an explicit lock-result cast.
+- Consistency: concurrent HTTP tests exposed Prisma raw-query serialization errors wrapped as P2010. Bounded transaction retries now handle the driver conflict metadata; replay and competing-assignment tests passed afterward.
+- Storage: official MinIO downloads failed with connection/time-out errors on both dl.min.io and dl.minio.io. Verified that storage failure left delivery status unchanged. Added a labeled development-only private filesystem store and then passed the full successful delivery/photo/replay/terminal-lock journey. Objects are outside public and evidence reads reauthorize each request.
+- UI: browser run exposed session-boundary navigation and ambiguous select labeling; fixed those. Current browser evidence is tracked separately from API success. Added responsive layouts, named fields, file preview/removal, loading/empty/error states and 15-second foreground polling with focus refresh.
+- Operations: documented startup validation, local adapter distinction, migrations/seed, admin bootstrap, outbox scheduling/retries, cleanup, backups and key custody. Production rejects development credentials/configuration unless an explicit loopback-only production-test opt-in is used.
 
-Continue phase 1: run migrations/seed against a real local PostgreSQL instance; verify MinIO/bucket and persistence; reconcile identity schema with the auth library; add complete parcel/assignment fixture coverage and DB integration tests. Domain services and authorization remain absent; no operational mutations are exposed.
+## Remaining external verification
 
-Actual check outcomes are appended to docs/ACCEPTANCE.md after scaffold verification.
+- MinIO/private S3 bucket and provider permissions using the supplied Compose/setup commands.
+- Hosted HTTPS, cookie/proxy/file-size configuration and backup/object/key restore rehearsal.
+- Remaining owner confirmations in DECISIONS.md concern delivery-date/photo defaults, currency and production operations. SMS is no longer required per the tracking update. No real SMS or public deployment is authorized or performed.
 
+Full completion of the plan's infrastructure/release exit criteria must not be inferred from passing local filesystem workflows.
 
-## Scaffold verification checkpoint
-
-Passed: clean npm install, Prisma validation/generation, lint, TypeScript, 13 unit tests, production build and production HTTP route smoke checks. Browser execution is blocked by an invalid browser download. Local Docker/database/storage integration remains unverified because required service executables are unavailable here. Continue from the remaining phase-1 tasks, then implement authentication and all operational services.
+## Navigation follow-up (2026-10-22)
+Removed the remaining mixed navigation from AppShell. This shell now checks ADMIN server-side and contains only the three Admin links. Customer and Rider retain separate shells; Rider navigation contains My Deliveries, notification bell and Sign out. Rebuilt and restarted localhost:3000. Verification: lint, typecheck and build passed; all 4 Chromium workflows passed (15.2 seconds), including navigation isolation, own-assignment/date filters and wrong-role Rider entry.

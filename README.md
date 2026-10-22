@@ -1,99 +1,68 @@
-# Parcel Delivery Next.js Code Starter
+# Parcel Delivery Management and Tracking
 
-A runnable Next.js App Router code scaffold for the Parcel Delivery Management and Tracking System. It includes TypeScript, Tailwind CSS, Prisma/PostgreSQL, private S3 storage configuration, Docker Compose, tests and the full PRD/implementation plan.
+Next.js App Router and strict TypeScript application with Admin, Rider and customer interfaces. Operational records use PostgreSQL through Prisma. Authenticated server services enforce role/assignment ownership, transactions, stale-write detection and durable idempotency. Photos use private S3-compatible storage, with an explicit durable filesystem fallback for local development. No operational arrays or browser localStorage remain.
 
-## What works now
+## Local setup
 
-- Next.js routes/layouts and responsive workspace navigation.
-- A read-only sample Rider list with five synthetic Riders and live name/mobile filters.
-- Customer, admin, Rider and login route foundations that identify pending workflows.
-- Domain helpers for result/status mapping, photo requirements and calendar-date calculation.
-- Shared Rider validation, Prisma schema and initial SQL migration, development seed, database/S3 client factories and liveness endpoint.
-- Unit-test and browser-test configurations and a GitHub Actions starter workflow.
+Use Node 24 and npm. On Windows with PowerShell script execution disabled, use `npm.cmd` instead of `npm`. Keep this repository as the app root.
 
-This is a code starter, not the completed product. Authentication, role/ownership enforcement, operational APIs, live database-backed screens, upload/result workflows, notifications and the SMS worker still need implementation. No private or operational data is exposed: only synthetic UI fixtures are connected. Do not connect real data until authorization is implemented.
-
-## Requirements
-
-- Node.js 24 (see `.nvmrc`) and npm.
-- Docker with Compose for local PostgreSQL/MinIO, if running database commands.
-- No database or external credentials are needed just to preview the starter screens.
-
-## Run the starter
-
-```bash
+```sh
 npm ci
+npm run env:local
+docker compose up -d
+npm run db:deploy
+npm run storage:init
+npm run db:seed
 npm run dev
 ```
 
-Open http://localhost:3000. `npm ci` generates the Prisma client automatically. The preview does not read the database. On Windows, use the same npm commands in PowerShell.
+`env:local` creates an ignored `.env` with random server keys and `SEED_PASSWORD`; it refuses to overwrite an existing file. Review `.env` before continuing. Compose binds PostgreSQL and MinIO to loopback and retains their data in volumes. Do not use `docker compose down -v` if you want to retain data. `db:deploy` applies committed migrations without resetting data. Seed requires explicit `NODE_ENV=development`, provisions `admin@parcel.test` and `rider1@parcel.test` through `rider5@parcel.test`, and creates five parcel fixtures covering unassigned, assigned, unreachable, preference changes and delivered proof. Their private local password is `SEED_PASSWORD` in `.env`; it is never printed by seed and no credentials are committed.
 
-## Local services and database
+Open [localhost:3000](http://localhost:3000). Staff sign in at `/login`. Admins create Riders and receive a setup password once; Riders must change it at first sign-in. Customers and Admins use the same **parcel code** (for example `P-…`) at `/track`. Admins can also search by parcel code in `/admin/parcels` and open full details. No separate tracking code, customer login or SMS is needed. Riders see dated assignments and notifications and can submit unreachable attempts or successful delivery with one photo.
 
-Copy `.env.example` to `.env` using your editor, or `cp .env.example .env` on macOS/Linux and `Copy-Item .env.example .env` in PowerShell. The template contains local-development defaults only.
+The customer entry (`/`, redirecting to `/track`) shows tracking and receiving preferences only. The Rider portal (`/rider/assignments`) has My Deliveries, a notification bell and sign-out; it contains no customer/Admin workspace links. `/login` is the separate staff sign-in page. Existing Admin screens remain available for a later interface pass.
 
-```bash
-npm run services:up
-npm run db:deploy
-npm run db:seed
+Rider delivery lists always use the signed-in Rider and selected delivery date, defaulting to today in the business timezone. Changing a Rider ID in a request cannot show another Rider's work. If an Admin session opens the Rider portal, it shows a Rider-account sign-in prompt instead of returning to the Admin workspace.
+
+If MinIO is unavailable, explicitly set `STORAGE_ADAPTER=filesystem` and `PRIVATE_STORAGE_PATH=.local/private-objects` in `.env`. Then start only PostgreSQL (`docker compose up -d postgres`), run `npm run storage:init`, migrate, seed and start normally. This stores real durable private files outside `public`; it is not MinIO verification. The filesystem adapter is refused in production unless the explicit loopback test flag is set.
+
+## This Windows workspace
+
+The installed system Node 22.11 cannot run the locked Prisma version. A Node 24.22 runtime and PostgreSQL 18.4 binaries were downloaded under ignored `.local` for verification; the system installation was not changed. PostgreSQL's local development cluster uses loopback and trust authentication and must never be exposed or used for production. Start it after a restart using:
+
+```powershell
+& '.local/postgres/node_modules/@embedded-postgres/windows-x64/native/bin/pg_ctl.exe' -D '.local/pgdata' -l '.local/postgres.log' -o '-p 5432 -h 127.0.0.1' -w start
+node scripts/run-local.mjs dev
 ```
 
-The migration deployment command applies committed migrations. For later schema changes, use `npm run db:migrate -- --name describe_change` and review generated SQL. Do not use reset commands against production.
+`node scripts/run-local.mjs <script-name>` runs an npm script using this project-local Node 24. For example, `node scripts/run-local.mjs test` or `node scripts/run-local.mjs db:deploy`. This optional helper requires the ignored runtime already present on this machine; a fresh clone should install Node 24 normally. Windows may require permission to start local service processes.
 
-The seed is restricted to explicit `NODE_ENV=development` and creates only five synthetic Rider profiles, without login accounts or parcels. It is idempotent by fixture ID. Authentication and complete operational fixture generation remain for Codex.
+## Verification commands
 
-PostgreSQL listens on localhost:5432. MinIO API is localhost:9000 and console is http://localhost:9001. Console credentials for local development are `parcel_local` / `parcel_local_secret_change_me`. The Compose file binds services to localhost only. Create the `parcel-proof-private` bucket in the console and keep anonymous/public access disabled. No upload API is implemented yet. Never use these credentials in production.
-
-Stop services with `npm run services:down`; named volumes retain data. Deleting volumes removes the local database and objects.
-
-## Checks
-
-```bash
+```sh
 npm run db:validate
 npm run lint
 npm run typecheck
 npm test
-npm run build
-npm run test:smoke
-npx playwright install chromium
+# With the app running against synthetic local data:
+EXPECT_STORAGE=true npm run test:integration
+npm run test:outbox
+npm run test:maintenance
 npm run test:e2e
+npm run test:performance -- --seed
+# Explicit local production-build validation, never a public deployment:
+LOCAL_PRODUCTION_TEST=true npm run build
+LOCAL_PRODUCTION_TEST=true npm start
 ```
 
-The HTTP smoke command starts the built production server, checks routes and stops it. The Playwright browser test starts the dev server automatically. Unit tests cover the included domain rules; these are not full PRD acceptance tests. See `docs/ACCEPTANCE.md` for actual executed results and remaining checks.
+PowerShell sets variables separately: `$env:EXPECT_STORAGE='true'` or `$env:LOCAL_PRODUCTION_TEST='true'`. Integration/browser checks write additional synthetic fixtures and must not target production. Set `EXPECT_STORAGE=true` for the complete photo journey; omitting it tests the explicit unavailable-storage failure scenario and requires storage to be unavailable. Playwright uses installed Chrome on this Windows machine, otherwise `npx playwright install chromium`; `PLAYWRIGHT_EXECUTABLE_PATH` can specify a browser. Browser traces are disabled to avoid capturing bearer codes and credentials.
 
-`GET /api/health` reports app liveness only. It does not report database, storage or product readiness.
+The performance command seeds up to 100 benchmark parcels, as requested by the owner, and measures 20 concurrent readers. It preserves existing fixtures and prints aggregate counts and timings only.
 
-## Code layout
+Parcel tracking does not use SMS and parcel creation does not enqueue SMS. The existing optional outbox maintenance tools remain for compatibility with historical events. `npm run photos:cleanup` removes only old unattached staged objects. See [operations](docs/OPERATIONS.md) for production config, request limits, backup/restore and key custody.
 
-```text
-src/
-  app/
-    (public)/track/
-    (auth)/login/
-    (admin)/admin/{riders,parcels,assignments}/
-    (rider)/rider/{assignments,notifications}/
-    api/health/
-  components/             shared shell, sample table, starter states
-  domain/                 delivery enums and business helpers
-  lib/                    database, storage, dates and validation
-  server/                 policies, services, repositories, notifications, sms
-prisma/
-  schema.prisma
-  migrations/
-  seed.ts
-workers/                  future outbox worker boundary
-tests/                   unit, integration and browser tests
-docs/                    PRD, plan, decisions and verification
-```
+## Defaults and limits
 
-Database client code is generated into `src/generated/prisma` and deliberately excluded from Git/ZIP. npm install regenerates it. Dependencies, build output and real `.env` files are also excluded.
+Expected delivery is scheduled delivery date plus three calendar days. Unreachable maps to Delay and can be retried. Successful delivery requires one valid JPEG/PNG, at most 10 MiB. Delivered is terminal. Preferences may change before delivery. Currency is MMK with two decimal places; changing the supported scale requires a migration. Business dates default to Asia/Yangon. The parcel code grants access to the minimal customer tracking view and receiving preferences through a 30-minute HttpOnly parcel-scoped session. Admin/Rider operational details and photos still require authenticated ownership. No SMS is needed and no public deployment was performed.
 
-## Continue with Codex
-
-Open this folder as the repository root. Read `AGENTS.md` and paste the prompt from `CODEX_START.md`. Codex should inspect the existing scaffold, preserve compatible work and continue from the remaining phase-1 tasks in `docs/PROGRESS.md`. Do not run create-next-app over this folder or regenerate the project unnecessarily.
-
-The PRD source is `docs/PRD.docx`, with searchable extraction in `docs/PRD.md`. The full implementation contract is `docs/IMPLEMENTATION_PLAN.md`; provisional business decisions are recorded separately.
-
-## Deployment
-
-Public deployment is not part of this starter. Before deployment, complete authentication/authorization, private upload validation, transactional domain services, persistent production rate limiting, migrations/storage/backup configuration and full acceptance verification. Real SMS stays disabled pending explicit provider configuration and authorization. Preserve the full source specification and reconcile schema changes with it.
+Read [decisions](docs/DECISIONS.md), [progress](docs/PROGRESS.md), and [actual acceptance evidence](docs/ACCEPTANCE.md). MinIO/S3 verification and production configuration are separate from the passing private filesystem workflow; this project is not declared production-ready.

@@ -62,8 +62,7 @@ enum OutboxState {
   FAILED
 }
 
-// Identity foundation only. Extend/reconcile this model with the chosen auth
-// library before connecting operational routes. No credentials are seeded.
+// Better Auth identity; roles and activity are rechecked from PostgreSQL for every operation.
 model User {
   id             String       @id @default(uuid()) @db.Uuid
   email          String       @unique @db.VarChar(254)
@@ -77,6 +76,66 @@ model User {
   createdParcels Parcel[]     @relation("ParcelCreator")
   assignments    Assignment[] @relation("AssignmentCreator")
   uploads        PhotoAsset[]
+  emailVerified Boolean @default(false)
+  image String?
+  mustChangePassword Boolean @default(true)
+  sessions Session[]
+  accounts Account[]
+}
+
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  token String @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Account {
+  id String @id @default(uuid()) @db.Uuid
+  accountId String
+  providerId String
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken String?
+  refreshToken String?
+  idToken String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope String?
+  password String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id String @id @default(uuid()) @db.Uuid
+  identifier String
+  value String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([identifier])
+}
+
+model TrackingSession {
+  id String @id
+  parcelId String @db.Uuid
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model RateLimit {
+  id String @id
+  count Int
+  resetAt DateTime
 }
 
 model Rider {
@@ -164,6 +223,7 @@ model Assignment {
   // Partial uniqueness of active parcel assignment is added in migration SQL.
 
   @@unique([id, parcelId])
+  @@unique([id, parcelId, riderId])
   @@index([riderId, deliveryDate, lifecycle])
   @@index([parcelId])
 }
@@ -203,6 +263,7 @@ model PhotoAsset {
   attempt      DeliveryAttempt?
 
   @@index([lifecycle, createdAt])
+  @@unique([id, assignmentId, parcelId])
 }
 
 model RiderNotification {

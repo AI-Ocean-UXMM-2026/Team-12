@@ -1,2 +1,9 @@
-import { WorkflowPlaceholder } from "@/components/workflow-placeholder";
-export default function Page() { return <WorkflowPlaceholder title="Authentication setup pending" tasks={["Select and configure a maintained authentication library with secure server sessions.", "Implement admin-provisioned Rider access, initial password setup and revocation.", "Replace public sample screens with role-protected operational layouts and APIs before connecting real data."]}/>; }
+import { StaffAuthShell } from "@/components/portal-shells";
+import { Login } from "@/components/workflows";
+export default function Page() {
+  return (
+    <StaffAuthShell title="Staff sign in">
+      <Login />
+    </StaffAuthShell>
+  );
+}

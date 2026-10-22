@@ -24,13 +24,24 @@
     "services:up": "docker compose up -d",
     "services:down": "docker compose down",
     "postinstall": "prisma generate",
-    "test:smoke": "node scripts/smoke.mjs"
+    "test:smoke": "node scripts/smoke.mjs",
+    "env:local": "node scripts/local-env.mjs",
+    "storage:init": "tsx scripts/storage-init.ts",
+    "worker:once": "tsx workers/outbox.ts",
+    "photos:cleanup": "node --conditions=react-server --import tsx scripts/cleanup-photos.ts",
+    "test:integration": "tsx tests/integration/journeys.ts",
+    "test:outbox": "tsx tests/integration/outbox.ts",
+    "admin:bootstrap": "tsx scripts/bootstrap-admin.ts",
+    "outbox:retry": "tsx scripts/retry-outbox.ts",
+    "test:performance": "tsx scripts/performance.ts",
+    "test:maintenance": "node --conditions=react-server --import tsx tests/integration/maintenance.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",
     "@hookform/resolvers": "5.2.2",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "better-auth": "^1.7.12",
     "dotenv": "^17.0.0",
     "lucide-react": "^0.577.0",
     "next": "16.4.2",
@@ -39,6 +50,7 @@
     "react-dom": "19.3.1",
     "react-hook-form": "^7.0.0",
     "server-only": "0.0.1",
+    "sharp": "^0.35.5",
     "zod": "^4.0.0"
   },
   "devDependencies": {

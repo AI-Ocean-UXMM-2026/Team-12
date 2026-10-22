@@ -1,11 +1,1 @@
-# Server boundaries
-
-This directory is reserved for the production workflows defined in the plan. No operational API is connected to the sample UI.
-
-- `policies`: authenticated identity, active-user checks and parcel/assignment ownership; deny by default.
-- `services`: transaction boundaries and domain orchestration; no direct request-body ORM writes.
-- `repositories`: typed PostgreSQL access behind services.
-- `notifications`: persisted events and recipient scoping.
-- `sms`: disabled/local/provider adapters and outbox delivery.
-
-Do not expose `getDb()` through routes before authentication, authorization and input validation are implemented. `GET /api/health` is the only current API and is liveness only. Authentication library selection/integration remains phase 2 work.
+Domain mutations live in services and are called by independently guarded API handlers. `security.ts` derives identity from Better Auth's database session, rechecks current account activity and role, and validates parcel-scoped customer sessions established by parcel-code lookup. `services/core.ts` owns serializable transactions, row locks, bounded retry and persistent idempotency. Never trust browser-supplied actors or spread unvalidated input into Prisma writes. Per current owner instruction, customers and Admins track using parcel codes; parcel creation does not enqueue SMS.

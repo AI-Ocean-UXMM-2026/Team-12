@@ -1,61 +1,64 @@
 # Acceptance and verification record
 
-The complete scenario definitions are in section 12 of `IMPLEMENTATION_PLAN.md`. This file records actual implementation and evidence. Product acceptance remains unverified; scaffold checks are recorded below.
+Updated 2026-10-22. Results below concern real PostgreSQL and the explicitly labeled private filesystem fallback. MinIO/S3 provider integration is not passed. Earlier scaffold-only results remain in git history and are superseded by this record.
 
-| Requirement | Required evidence | Code/test references | Result |
-| --- | --- | --- | --- |
-| CUS-01 | Correct scoped parcel, invalid-code response, latest status, private DTO | Pending | Not run |
-| CUS-02 | Three receiving options, instructions, parcel isolation, notification, delivered lock | Pending | Not run |
-| DRV-01 | Date/code filters, fields, contact copy, results/photos, owner checks | Pending | Not run |
-| DRV-02 | Bell/read state, persisted notifications, filters, correct authorized links | Pending | Not run |
-| ADM-01 | Create/view/edit/deactivate, required fields, vehicles, account revocation | Pending | Not run |
-| ADM-02 | Required parcel fields, COD validation, unique codes and tracking, communication state | Pending | Not run |
-| ADM-03 | Assign/reschedule/reassign, expected date, history, status and authorized proof | Pending | Not run |
-| Security | Role and parcel isolation, CSRF, rate limits, expired/revoked sessions, private photos | Pending | Not run |
-| Consistency | Idempotency, stale writes, assignment/delivery/preference/deactivation races | Pending | Not run |
-| Uploads | Valid formats, size/count, corrupt/forged images, relationship checks, cleanup | Pending | Not run |
-| Reliability | Restart persistence, outbox retries and failed submission recovery | Pending | Not run |
-| Usability | Mobile layouts, keyboard access, labels, loading/empty/error states | Pending | Not run |
+## Parcel-code tracking owner update
 
-## End to end journeys
+The owner replaced separate private tracking codes/SMS with parcel-code lookup for customers and Admins. Updated tests exchange `parcelCode`, check authorized Admin code search, and verify that no tracking secret/SMS status is returned and parcel creation queues no SMS. Verified after rebuilding/restarting the local production-mode app: strict TypeScript and ESLint passed; both browser journeys passed using parcel codes; the full HTTP/authorization/concurrency suite passed; all 27 unit tests passed. Existing parcel codes work without a data migration. Earlier secret-code evidence below describes the previous baseline and is superseded by this update.
 
-- [ ] Admin creates Rider/access and COD parcel, retrieves tracking code and assigns delivery.
-- [ ] Customer tracks and changes receiving preference/instruction; correct Rider sees notification and latest values.
-- [ ] Rider submits unreachable then retries with valid delivery photo; customer transitions Delay to Delivered; admin accesses proof.
-- [ ] Reassignment transfers access; previous Rider cannot read/submit; new Rider sees correct dates/preferences.
-- [ ] Second Rider and second tracking scope cannot read/change first parcel by manipulating IDs.
+## Customer and Rider interface separation
 
-## Check execution log
+Follow-up Rider scope check: added a wrong-account prompt for Admin sessions visiting Rider URLs, so those routes never show Admin navigation. The list API always derives Rider identity from the authenticated session and applies a selected date or business-today default. Passed lint, strict typecheck and production build. All four browser tests passed, including the wrong-account route and selected-date switching. The HTTP suite passed, including both Rider scopes, a forged Rider filter that cannot override ownership, and an alternate date that does not return the parcel. Rebuilt app restarted on localhost.
 
-| Date | Command or manual scenario | Environment | Result and evidence |
-| --- | --- | --- | --- |
-| — | Full PRD application checks | Product implementation pending | Not run |
+Owner requested CUS-01/CUS-02 customer-only pages and a My Deliveries Rider interface with the notification bell; Admin work is deferred. Dedicated shells replace shared workspace navigation on `/track`, `/track/result` and Rider routes; `/` redirects to `/track`. Staff auth pages have a standalone form. Verified on the rebuilt local production-mode app: lint, strict typecheck, 27 unit tests, production build and route smoke all passed; all three browser tests passed. Browser checks cover absence of cross-workspace links, 360px public layout/invalid code, Rider-only navigation, My Deliveries parcel filter, bell access, notification date/code filters and mark-read, contact copy, unreachable/retry, private photo delivery and reassignment/isolation. The HTTP regression suite passed, including exact receiving-option/instruction-only notification messages, no-op deduplication, authorization and concurrent writes. Existing Admin page behavior was preserved for the later pass.
 
-Codex must append exact lint, typecheck, unit/integration/browser test and production-build commands and results. Also record fresh migration/seed/restart checks, mobile/accessibility review and performance measurements. A skipped or blocked check is not a pass.
+| Requirement | Implementation references | Actual evidence |
+| --- | --- | --- |
+| CUS-01 | `src/server/security.ts`, `services/operations.ts`, tracking API/UI | HTTP valid/invalid code, minimal DTO, parcel session, tampered token and latest committed statuses passed. |
+| CUS-02 | Preference schema/service, transaction notifications, tracking UI | HTTP material instruction/option update, no-op deduplication, wrong body scope rejection, stale version, second scope isolation and Delivered lock passed. |
+| DRV-01 | Assignment/result services, image decoder, private store and authorized proof stream | HTTP owner denial, unreachable/replay, reassignment denial, mandatory/corrupt-photo validation, successful delivery and persisted private photo passed. Format/size/metadata checks covered by unit tests. Browser delivery and former-Rider evidence denial passed. |
+| DRV-02 | Notification transaction helper, API, notification center/bell | HTTP persisted correct-Rider notification, scheduled-date/code filters, unread decrement and read-ownership denial passed. Browser notification/preference visibility passed. Outbox is separate from in-app notifications. |
+| ADM-01 | Rider service/UI, Better Auth, bootstrap/seed | HTTP create/provision, forced password change, blocked deactivation, successful inactive-account revocation and role denial passed. All three vehicle types are validated. |
+| ADM-02 | Parcel schema/service/UI, crypto helpers, persistent idempotency | HTTP COD validation, unique codes, encrypted admin redisplay, tracking relationship, same-key replay and different-payload conflict passed. Concurrent same-key create passed. |
+| ADM-03 | Assignment service/UI, calendar helper, DB constraints/history | HTTP date calculation, correct owner/detail, explicit reassignment/history, same-key concurrent replay and competing reschedule/reassignment passed. |
+| Security/consistency | Independent API guards, scoped DTOs, versioned serializable transactions, DB constraints | HTTP CSRF, second scope, role/ownership, stale writes, tampered session, revoked account, immutable attempts and Rider/attempt relationship checks passed. |
+| Communication | `workers/outbox.ts`, `tests/integration/outbox.ts` | PostgreSQL-backed simulated retry, concurrent claims, lease recovery, exhausted failures and disabled mode passed. No real provider tested or SMS sent. |
+| Storage/reliability | Private object adapter, staging cleanup, proof authorization | Real local files, DB attachment, restart persistence and staged cleanup passed. Unavailable S3 path returned 503 without recording delivery. MinIO integration remains unverified. |
+
+## Commands actually executed
+
+Environment: Windows, system Node 22.11/npm 10.9; project-local Node 24.22 used for compatible checks. PostgreSQL 18.4 binaries are from the `@embedded-postgres/windows-x64` distribution. Local-only database is bound to loopback. No credentials or private assets are committed.
+
+| Command/scenario | Result |
+| --- | --- |
+| `npm ci` via `npm.cmd` | Initial sandbox cache access failure, then Prisma rejected system Node. Clean install under project-local Node 24 completed; Prisma client generated. |
+| `prisma validate` | Passed for the extended auth schema. |
+| `prisma migrate deploy` | Initial and auth migrations applied to fresh PostgreSQL; evidence constraints migration applied subsequently. |
+| Development seed | Passed; local admin, five provisioned Riders, unassigned/assigned/unreachable/preferences/delivered fixtures and private synthetic proof. |
+| Existing `vitest run` | Passed 13 starter unit tests. |
+| Expanded `vitest run` | Passed 27 tests in two files, including crypto tamper checks, image decoding/metadata/size/format and operational validation. |
+| `npm run typecheck` | Passed after final clean install; Prisma generation, Next route type generation and strict TypeScript completed. |
+| `npm run lint` | Passed after final clean install with no errors or warnings. |
+| `tsx tests/integration/journeys.ts`, `EXPECT_STORAGE=true` | Passed all printed scenario groups including full photo delivery and expanded concurrent idempotency/assignment/security checks. |
+| Final HTTP run against restarted production-mode app | Passed, including notification filters/unread/read ownership. The helper honored the production login limiter's retry interval; no rate limit was weakened. Final strict TypeScript and test-file ESLint also passed. |
+| Same HTTP journey with unavailable storage | Passed failure variant: valid photo returned 503 and parcel remained undelivered. This was run before local fallback was enabled. |
+| `tsx tests/integration/outbox.ts` | Passed retry, concurrent claim, stale lease recovery, exhausted failure, disabled mode; simulated transports only. |
+| Browser journeys | Passed two Chromium journeys against the production-mode app: end-to-end Admin/customer/Rider delivery and reassignment/former-Rider proof denial/two tracking scopes. Tests reuse successful sessions in memory rather than weakening production login limits. |
+| MinIO download attempts | Blocked: official dl.min.io and dl.minio.io hosts failed to connect/timed out. Docker unavailable. |
+| `npm audit --omit=dev --json` | Zero production dependency advisories on recorded run. Full install reported five high advisories in development dependencies; no force/breaking upgrade performed. |
+
+## Final verification checkpoint
+
+Final `npm ci` under Node 24 passed with Prisma postinstall generation. The documented `lint`, `typecheck`, `test` (27 tests), `build` and `test:smoke` commands then passed. Build used explicit loopback `LOCAL_PRODUCTION_TEST=true`; no filesystem tracing warnings remain, and runtime private data/environment files are excluded from tracing. Production smoke passed public routes, five protected redirects, liveness/readiness and unauthenticated API denial. Two browser journeys passed. Cleanup rehearsal passed expiration/recent-stage/attached-evidence checks. The app was stopped and the development PostgreSQL server stopped/restarted; parcel states, assignments, delivery attempts, notifications and private proof checksums matched the recorded baseline afterward. The rebuilt app was started again on localhost for handoff.
+
+Owner revised the benchmark to 100 synthetic parcels. `scripts/performance.ts --seed` passed on the local production-mode app with Node 24.22/Windows/PostgreSQL/private filesystem storage: exactly 100 benchmark parcels, 115 total including existing fixtures; 20 concurrent readers, 100 measured requests per endpoint after warmup. Tracking p95 236 ms (max 365 ms); assignment list p95 392 ms (max 406 ms). PostgreSQL used the unique tracking lookup index. No 10,000-parcel capacity claim is made.
+
+Measurement hardware: Intel Core i7-1280P, 20 logical CPUs, 16 GiB RAM. All requests were loopback and excluded image-upload transfer time.
+
+Later browser runs add a small number of acceptance parcels without changing the 100 benchmark fixtures. The counts above describe the measurement dataset, not a destructive cap on existing records.
 
 ## Release limitations
 
-Record missing credentials, unverified external integrations, unresolved production decisions and operational gaps. Never mark real SMS verified using the local adapter.
+Private S3/MinIO integration, hosted HTTPS/proxy configuration and backup/restore rehearsal remain unverified. Local filesystem proof and loopback production-build tests do not establish those properties. Real SMS is disabled; only the redacted local simulator exists. Production decisions and remaining infrastructure are documented in DECISIONS.md and OPERATIONS.md.
 
-
-## Scaffold verification on 2026-10-21
-
-Environment: Node.js 24.19.0, npm 11.9.0, Linux. These results validate the starter only, not the complete PRD.
-
-| Check | Result |
-| --- | --- |
-| `npm ci` | Passed; clean install and Prisma postinstall generation completed |
-| `npm run db:validate` / `npx prisma validate` | Passed; Prisma schema valid |
-| `npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script` | Passed; base SQL generated, then domain constraints added |
-| `npm run lint` | Passed without warnings after configuration cleanup |
-| `npm run typecheck` | Passed |
-| `npm test` | Passed, 13 unit tests |
-| `npm run build` | Passed; all starter routes compiled |
-| `npm run test:smoke` | Passed; eight production HTML routes and liveness/no-store check |
-| `npx playwright test --list` | Passed; one Chromium test discovered |
-| `npx playwright install chromium` | Blocked; downloaded browser archive was invalid/truncated in this environment |
-| Playwright browser execution | Not run; browser unavailable |
-| Docker services, migration apply, database seed and MinIO integration | Not run; Docker/PostgreSQL executables unavailable in this environment |
-| Full PRD authorization, concurrency and acceptance journeys | Not implemented or tested yet |
-
-The SQL migration is supplied but has not been applied to a live PostgreSQL instance here. Codex must verify it, the seed and private storage before marking phase 1 complete. CI includes Playwright installation/execution for an environment with working browser downloads.
+Navigation follow-up, 2026-10-22: rebuilt local application passed all 4 Chromium workflows (15.2s). Added an assertion that Admin navigation has exactly three links and no Customer/Rider/login links. Existing assertions verify Rider-only navigation on list, notification and detail pages, Customer-only tracking, and Admin-session isolation at the Rider URL. Lint, typecheck and production build passed.

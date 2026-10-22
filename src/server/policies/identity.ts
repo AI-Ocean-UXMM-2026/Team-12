@@ -1,9 +1,14 @@
 import "server-only";
-export type Actor = { userId: string; role: "ADMIN" | "RIDER"; riderId?: string };
-/** Fail closed until a maintained auth library's session verifier is wired in.
- * Do not replace this with browser-supplied IDs, cookies that aren't verified,
- * a development default user, or a role passed in request headers.
+import { actor } from "@/server/security";
+export type Actor = {
+  userId: string;
+  role: "ADMIN" | "RIDER";
+  riderId?: string;
+};
+/** Derive the actor from the verified database session and current account state.
+ * Never accept an actor or role from browser-supplied identifiers or headers.
  */
 export async function requireActor(): Promise<Actor> {
-  throw new Error("Authentication is not implemented. Operational access is denied.");
+  const user = await actor();
+  return { userId: user.id, role: user.role, riderId: user.rider?.id };
 }

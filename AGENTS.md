@@ -31,3 +31,13 @@ At handoff, report implemented features, actual run commands, tests actually exe
 ## Existing code status
 
 A working Next.js starter already exists. Run `npm ci`, inspect the source and `docs/PROGRESS.md`, then continue from unfinished phase-1 work. Do not reinitialize the app. Sample UI data in `src/lib/demo-data.ts` must be replaced by authorized database access during implementation, never treated as a production repository. Current admin/Rider routes are public sample screens with no real data, not protected product routes. Add authentication before operational data access. Rider.userId is nullable only for staged seed profiles; assignment policies must require an active provisioned user. Reconcile the initial User model with the selected auth library. Do not treat the existing migration/schema as complete enforcement of all service-level invariants.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
