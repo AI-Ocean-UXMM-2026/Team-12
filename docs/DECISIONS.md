@@ -1,5 +1,9 @@
 # Decision register
 
+## Current hosting override (2026-10-23)
+
+Owner requested: fully prepare and deploy on Vercel, use Vercel-managed infrastructure, push GitHub changes, remove GitHub Actions and use built-in repository importing/CI/CD. This supersedes the Actions deployment decision below. Native Vercel Git deployment is enabled. The hosted database is a dedicated free Neon resource provisioned through the existing Vercel Marketplace integration: Vercel's standalone Postgres product is discontinued. Evidence uses a dedicated PRIVATE Vercel Blob store. Assignment-bound direct upload grants (15 minutes, immutable path, 10 MiB limit) and authenticated finalization preserve image decoding, resource authorization and transactional idempotency. Raw uploads expire after 24 hours; a daily authenticated Cron removes expired raw and unattached staged proof. The original requirements remain unchanged. Preview branches require separate isolated infrastructure and configuration. Initial Admin access is generated privately, never seeded from local accounts.
+
 Status: initial defaults copied from the implementation plan. These are proposed reversible implementation decisions; no additional owner approvals are implied. Next.js is the confirmed framework. Resolve each decision through implementation and record any owner changes below.
 
 ## Initial defaults

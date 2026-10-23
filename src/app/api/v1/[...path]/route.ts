@@ -22,7 +22,9 @@ import {
   updatePreferences,
 } from "@/server/services/operations";
 import { submitResult } from "@/server/services/photos";
+import { createPhotoUpload, submitBlobResult } from "@/server/services/blob-uploads";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 type Context = { params: Promise<{ path: string[] }> };
 async function boundedForm(request: Request) {
   const reader = request.body?.getReader();
@@ -68,7 +70,12 @@ export async function GET(request: Request, { params }: Context) {
         "Photo unavailable.",
       );
       const bytes = await getPrivateStore().get(photo.storageKey);
-      return new Response(new Uint8Array(bytes), {
+      // Stream proof so valid images above 4.5 MB can be returned by Vercel Functions.
+      return new Response(new ReadableStream({ start(controller) {
+        for (let offset = 0; offset < bytes.length; offset += 65536)
+          controller.enqueue(new Uint8Array(bytes.subarray(offset, offset + 65536)));
+        controller.close();
+      } }), {
         headers: {
           "Content-Type": photo.detectedMime,
           "Cache-Control": "private, no-store",
@@ -351,11 +358,15 @@ async function write(request: Request, { params }: Context) {
         await request.json(),
         request.headers.get("Idempotency-Key") ?? "",
       );
+    if (path[0] === "rider" && path[1] === "assignments" && path[3] === "photo-upload")
+      return createPhotoUpload(z.uuid().parse(path[2]), await request.json());
     if (
       path[0] === "rider" &&
       path[1] === "assignments" &&
       path[3] === "results"
     ) {
+      if (request.headers.get("content-type")?.includes("application/json"))
+        return submitBlobResult(z.uuid().parse(path[2]), await request.json());
       invariant(
         Number(request.headers.get("content-length") ?? 0) <= 11534336,
         413,

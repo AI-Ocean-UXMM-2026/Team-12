@@ -1,5 +1,9 @@
 # Implementation progress
 
+## Vercel-native hosting update (2026-10-23)
+
+Owner superseded Actions deployment with native Vercel GitHub importing/CI/CD. Removed both Actions workflows and enabled native deployments. Provisioned a dedicated Neon free-plan PostgreSQL database through Vercel Marketplace and a PRIVATE Vercel Blob store; all four migrations applied. Generated independent production keys and initial Admin access privately. Added assignment-bound direct photo uploads, authenticated image finalization using existing transactional/idempotent services, streaming proof responses, pool limits/cold-start waits, and a protected daily staging-cleanup Cron. Added a deployment build command for config validation, committed migrations, first-Admin bootstrap and Next build. Local production build, lint, strict typecheck and 32 unit tests passed. GitHub push/native connection and hosted workflow verification are in progress; do not infer hosted acceptance from the earlier baseline deployment.
+
 Updated 2026-10-22. The starter has been extended into operational PostgreSQL-backed workflows. Sample data and placeholder components have been removed. Local proof storage is a private durable filesystem adapter because both official MinIO download hosts were unreachable; S3 code remains implemented but unverified here. This is an explicit environment workaround, not approval of a production architecture change.
 
 | Phase | Implementation and verification state |

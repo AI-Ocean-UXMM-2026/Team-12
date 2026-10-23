@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "build:vercel": "node scripts/vercel-build.mjs",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "prisma generate && next typegen && tsc --noEmit",
@@ -41,6 +42,7 @@
     "@hookform/resolvers": "5.2.2",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "@vercel/blob": "^2.8.1",
     "better-auth": "^1.7.12",
     "dotenv": "^17.0.0",
     "lucide-react": "^0.577.0",

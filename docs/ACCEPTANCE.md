@@ -1,5 +1,9 @@
 # Acceptance and verification record
 
+## Vercel-native migration (2026-10-23)
+
+Owner requested replacing GitHub Actions with native Vercel GitHub CI/CD and Vercel-managed infrastructure. Both workflow files were removed; native deployments are enabled. A dedicated PostgreSQL database was provisioned using the existing Neon Vercel Marketplace integration, and a PRIVATE Blob store was provisioned/connected. All four committed migrations applied successfully to the new database. An initial bootstrap timed out on a cold connection; increased the transaction acquisition timeout and reran successfully without changing existing credentials. `node --env-file=.vercel/.env.production.local scripts/vercel-build.mjs` then passed migration/bootstrap/config validation and the full Next.js production build. `npm run lint`, `npm run typecheck` and `npm test` passed (32 tests across three files). New tests cover upload scope, immutable paths, expiry, revoked-account denial, ownership rechecking and storage failure before result submission. Runtime credentials/access details are stored only in ignored files and Vercel environment settings. Hosted readiness, direct >4.5 MB upload and native Git deployment verification are still pending at this checkpoint.
+
 Updated 2026-10-22. Results below concern real PostgreSQL and the explicitly labeled private filesystem fallback. MinIO/S3 provider integration is not passed. Earlier scaffold-only results remain in git history and are superseded by this record.
 
 ## Parcel-code tracking owner update

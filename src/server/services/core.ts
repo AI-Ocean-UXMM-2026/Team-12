@@ -10,6 +10,7 @@ export async function transaction<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
       return await getDb().$transaction(work, {
         isolationLevel: "Serializable",
         timeout: 15000,
+        maxWait: 15000,
       });
     } catch (error) {
       if (

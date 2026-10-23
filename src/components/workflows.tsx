@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { expectedDeliveryDate } from "@/lib/dates";
+import { upload } from "@vercel/blob/client";
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init });
   const body = await response.json();
@@ -1030,6 +1031,25 @@ function ResultForm({ a, refresh }: { a: Assignment; refresh: () => void }) {
       submit={async (f, key) => {
         f.set("version", String(version));
         f.set("idempotencyKey", key);
+        const file = f.get("photo");
+        if (file instanceof File && file.size > 0) {
+          if (file.size > 10485760) throw new Error("Photo must be at most 10 MiB.");
+          if (!["image/jpeg", "image/png"].includes(file.type)) throw new Error("Choose a JPEG or PNG photo.");
+          const ticket = await api<{ mode: "blob" | "multipart"; id?: string; pathname?: string }>(
+            base + `rider/assignments/${a.id}/photo-upload`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ idempotencyKey: key }),
+            });
+          if (ticket.mode === "blob") {
+            await upload(ticket.pathname!, file, { access: "private", handleUploadUrl: "/api/blob/upload",
+              clientPayload: JSON.stringify({ ticketId: ticket.id }),
+              contentType: file.type, multipart: true });
+            return api(base + `rider/assignments/${a.id}/results`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ result: f.get("result"), version, idempotencyKey: key, uploadId: ticket.id }),
+            });
+          }
+        }
         return api(base + `rider/assignments/${a.id}/results`, {
           method: "POST",
           body: f,

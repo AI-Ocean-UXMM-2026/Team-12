@@ -1,42 +1,49 @@
-# Vercel deployment through GitHub Actions
+# Vercel-native deployment
 
-The owner authorized Vercel deployment on 2026-10-22. The workflow is prepared; an actual deployment requires a connected Vercel project, hosted PostgreSQL and private S3-compatible storage. Local database files, seed passwords and private photos are not uploaded.
+The owner requested Vercel's built-in GitHub integration on 2026-10-23, superseding GitHub Actions. Both Actions workflows have been removed. The repository root is the Next.js project root, Node 24 is selected in Vercel, and `vercel.json` uses `npm run build:vercel`. GitHub Actions secrets are not needed.
 
-## Connect the accounts
+## Infrastructure
 
-1. Create a Vercel project for this application, with repository root as the root directory, Next.js as the framework and Node 24.x. Reserve its production domain before configuring authentication.
-2. In GitHub repository **Settings → Secrets and variables → Actions**, add `VERCEL_TOKEN`, `VERCEL_ORG_ID` (Vercel team/account ID) and `VERCEL_PROJECT_ID`. Alternatively use the GitHub `production` environment secrets. Obtain the IDs from Vercel project settings or the ignored `.vercel/project.json` after linking locally. Give the token access to that project. Never commit or paste tokens into issues.
-3. If Vercel deployment protection is enabled, add its automation bypass value as `VERCEL_AUTOMATION_BYPASS_SECRET` in GitHub so the final readiness request can reach the deployment.
-4. Configure the following variables for the Vercel project's **Production** environment. Values used for builds must be available to `vercel pull`; non-downloadable sensitive variables need a separate secret injection arrangement before this workflow can build.
+- Project: `team-12-ai-ocean` in `kyawkokotuns-projects`.
+- Production origin: `https://team-12-ai-ocean.vercel.app`.
+- PostgreSQL: dedicated `team-12-postgres` Neon free-plan database provisioned and connected through Vercel Marketplace in `iad1`. Vercel no longer offers its own PostgreSQL product; Marketplace manages provisioning, connection strings and billing in Vercel.
+- Photos: PRIVATE Vercel Blob store `team-12-private-proof`, `iad1`. Raw uploads and processed evidence remain private. Hosted configuration needs no S3/MinIO.
+- Daily Vercel Cron at `/api/cron/photos` cleans expired raw uploads and old unattached proof. `CRON_SECRET` protects it. Each run handles up to 100 of each; monitor for backlog as volume grows.
 
-| Variable | Production value |
+## GitHub deployment flow
+
+Push the application to GitHub, then connect `AI-Ocean-UXMM-2026/Team-12` in Vercel Git settings, with `main` as the production branch. Subsequent pushes build and deploy automatically through Vercel. Removing `git.deploymentEnabled: false` enables native deployments. GitHub Actions no longer gates this flow. Run lint, typecheck and tests before pushing.
+
+`build:vercel` generates Prisma, validates configuration, applies committed migrations using `DATABASE_URL_UNPOOLED` when present, optionally provisions the first Admin in an empty installation, and builds Next.js. It never seeds development accounts, resets data or replaces existing credentials. Migrations must remain compatible with the previous running release. A failed build does not undo migrations.
+
+Production variables are scoped to Production. Previews require their own isolated database, private Blob store, independent secrets and matching `APP_BASE_URL`; never copy production credentials into untrusted branches. Builds fail on missing configuration. Preview verification is separate.
+
+## Production configuration
+
+| Variable | Value/source |
 | --- | --- |
-| `DATABASE_URL` | Hosted PostgreSQL URL with provider-required TLS, reachable from GitHub runners and Vercel. Must support Prisma migrations; use a migration-capable endpoint. |
-| `APP_BASE_URL` | Canonical HTTPS production origin, without a trailing slash. |
-| `AUTH_SECRET` | Independent random secret, at least 32 characters. |
-| `TRACKING_HMAC_KEY` | Independent random secret, at least 32 characters. |
+| `DATABASE_URL`, `DATABASE_URL_UNPOOLED` | Injected by Vercel Marketplace; pooled runtime and unpooled migration URL. |
+| `BLOB_READ_WRITE_TOKEN` | Injected by the private Blob store; server-only. |
+| `APP_BASE_URL` | `https://team-12-ai-ocean.vercel.app` |
+| `STORAGE_ADAPTER` | `vercel-blob` |
+| `AUTH_SECRET`, `TRACKING_HMAC_KEY` | Independent random secrets, at least 32 characters. |
 | `TRACKING_ENCRYPTION_KEY` | Independent random 32-byte key encoded as 64 hexadecimal characters. |
-| `STORAGE_ADAPTER` | `s3` |
-| `S3_BUCKET` | Existing private bucket with public access blocked. |
-| `S3_REGION` | Provider region. |
-| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Restricted private bucket credentials. |
-| `S3_ENDPOINT` | Provider endpoint if required; omit for AWS S3 defaults. |
-| `S3_FORCE_PATH_STYLE` | Provider-specific, usually `false` for AWS. |
-| `BUSINESS_TIMEZONE`, `APP_CURRENCY`, `MONEY_DECIMAL_PLACES` | Existing defaults: `Asia/Yangon`, `MMK`, `2`. |
-| `SMS_ENABLED` | `false`; deployment does not enable SMS. |
+| `CRON_SECRET` | Independent random secret for authenticated Vercel Cron. |
+| `SMS_ENABLED` | `false` |
+| `TRUST_PROXY` | `true` behind Vercel's trusted proxy; do not expose untrusted ingress. |
+| `BUSINESS_TIMEZONE`, `APP_CURRENCY`, `MONEY_DECIMAL_PLACES` | `Asia/Yangon`, `MMK`, `2` |
+| `ADMIN_BOOTSTRAP_EMAIL`, `ADMIN_BOOTSTRAP_PASSWORD` | Temporary first-Admin settings. Only create if no Admin exists. Remove after initial deployment. |
 
-Do not configure `SEED_PASSWORD`, `LOCAL_PRODUCTION_TEST=true` or filesystem storage in Vercel. Generate fresh production keys; do not copy local development keys. Keep a private backup of encryption keys. Review forwarded-client-IP handling before enabling `TRUST_PROXY`.
+Never enable filesystem storage, `SEED_PASSWORD` or `LOCAL_PRODUCTION_TEST` in Vercel. The ignored `.local/vercel-production-secrets.json` holds initial access details generated on the owner's computer; keep it private. Change the initial Admin password at first sign-in. Back up encryption keys privately; never commit them.
 
-## Run and verify
+## Photo handling
 
-Push to `main`, or open GitHub **Actions → Application checks → Run workflow** and select `main`. CI runs the existing database, unit, HTTP and browser checks before calling the deployment workflow. Pull requests never deploy production. The deployment job serializes releases, validates configuration, builds with pinned Vercel CLI 65.0.0, applies committed migrations without seeding/resetting data, checks hosted database/storage, and deploys the prebuilt output. It then requests `/api/ready`. The deployment URL is recorded in the job summary. A failed post-deployment check does not automatically roll back a release or database migration.
+The Rider UI requests an assignment-bound upload ticket. The token route checks active Rider identity and current ownership, then grants a 15-minute permission for one immutable path, JPEG/PNG types and a 10 MiB maximum. The browser uploads to PRIVATE Blob directly, bypassing the Function request-body limit. Tokens cannot overwrite, list or read objects.
 
-`vercel.json` disables Vercel's independent Git deployments so pushes deploy through GitHub Actions. CLI deployments remain enabled. GitHub environment protection rules, if configured by the owner, still apply. Do not download or publish `.vercel` as an artifact: it contains pulled environment values.
+Finalization sends only the ticket ID and result metadata. The server rechecks ownership, fetches raw bytes by the database's exact key, validates and re-encodes with sharp, strips EXIF, writes separate private JPEG proof and attaches it through the existing versioned/idempotent transaction. Corrupt files, stale versions, former/revoked Riders and storage failures do not record delivery. Raw bytes never become operational proof. Twenty-four-hour raw retention supports retries; authenticated daily Cron removes expired uploads. Evidence reads reauthorize Admin/current Rider and stream bytes, including photos above 4.5 MB.
 
-Provision the first production Admin privately using `npm run admin:bootstrap` against the hosted database, as described in [OPERATIONS.md](OPERATIONS.md). Do not seed development accounts into production. Create Rider accounts from the authenticated Admin interface. The local login passwords do not exist in a fresh production database.
+## Verification
 
-## Known hosting limitation
+Check `/api/ready` for database AND private Blob connectivity after release. Verify public tracking, operational access denial, Admin login/setup, Rider ownership, direct photo delivery, replay and notifications. A passing build alone is insufficient. Actual results are in `ACCEPTANCE.md` and `PROGRESS.md`.
 
-The current authorized photo endpoint sends multipart uploads through the application. Vercel Functions cap request and response bodies at 4.5 MB, while CUS/DRV requirements allow a 10 MB JPEG/PNG photo. Files over the host limit fail before application validation. No setting in this workflow removes that limit, and the 10 MB product requirement has not been reduced. Full compliance on Vercel requires a separately implemented authorized direct-to-private-storage upload flow with assignment-bound upload authorization, image validation, finalization and replay/concurrency protection, or a backend host accepting the existing 11 MiB multipart envelope. Small-photo workflows can run after infrastructure configuration; complete production acceptance remains outstanding.
-
-References: [Vercel with GitHub Actions](https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel), [Vercel pull](https://vercel.com/docs/cli/pull), [Function limits](https://vercel.com/docs/functions/limitations).
+References: [Vercel GitHub](https://vercel.com/docs/git/vercel-for-github), [Marketplace PostgreSQL](https://vercel.com/docs/postgres), [private Blob](https://vercel.com/docs/vercel-blob/private-storage), [client uploads](https://vercel.com/docs/vercel-blob/client-upload), [Cron](https://vercel.com/docs/cron-jobs).

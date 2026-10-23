@@ -46,7 +46,10 @@ export function validateConfig(
         "No real SMS provider is approved or implemented. Disable SMS before production.",
       );
   }
-  if (env.STORAGE_ADAPTER !== "filesystem")
+  if (env.STORAGE_ADAPTER === "vercel-blob") {
+    if (!env.BLOB_READ_WRITE_TOKEN)
+      throw new Error("BLOB_READ_WRITE_TOKEN is required for private Vercel Blob storage.");
+  } else if (env.STORAGE_ADAPTER !== "filesystem")
     for (const key of [
       "S3_BUCKET",
       "S3_REGION",

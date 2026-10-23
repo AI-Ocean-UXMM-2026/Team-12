@@ -331,3 +331,16 @@ model IdempotencyRecord {
   @@unique([actorId, action, key])
   @@index([expiresAt])
 }
+
+// Short-lived, immutable-path upload permission. Raw bytes are never evidence.
+model PhotoUploadTicket {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  assignmentId   String   @db.Uuid
+  storageKey     String   @unique
+  idempotencyKey String   @db.VarChar(128)
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  @@index([expiresAt])
+}

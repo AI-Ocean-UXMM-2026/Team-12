@@ -1,6 +1,10 @@
 # Parcel Delivery Management and Tracking
 
-Next.js App Router and strict TypeScript application with Admin, Rider and customer interfaces. Operational records use PostgreSQL through Prisma. Authenticated server services enforce role/assignment ownership, transactions, stale-write detection and durable idempotency. Photos use private S3-compatible storage, with an explicit durable filesystem fallback for local development. No operational arrays or browser localStorage remain.
+Next.js App Router and strict TypeScript application with Admin, Rider and customer interfaces. Operational records use PostgreSQL through Prisma. Authenticated server services enforce role/assignment ownership, transactions, stale-write detection and durable idempotency. Hosted photos use PRIVATE Vercel Blob with direct browser uploads; local development also supports private S3-compatible storage and a durable filesystem fallback. No operational arrays or browser localStorage remain.
+
+## Vercel hosting
+
+Production uses Vercel's built-in GitHub integration, Vercel Marketplace PostgreSQL and PRIVATE Vercel Blob. GitHub Actions workflows have been removed at the owner's request. Pushes to connected `main` deploy with `npm run build:vercel`, applying committed migrations without development seeding. Direct uploads support the full 10 MiB photo limit. Daily authenticated Vercel Cron cleans expired staging. See [deployment configuration](docs/VERCEL.md) and [actual verification](docs/ACCEPTANCE.md).
 
 ## Local setup
 
@@ -67,4 +71,4 @@ Expected delivery is scheduled delivery date plus three calendar days. Unreachab
 
 Read [decisions](docs/DECISIONS.md), [progress](docs/PROGRESS.md), and [actual acceptance evidence](docs/ACCEPTANCE.md). MinIO/S3 verification and production configuration are separate from the passing private filesystem workflow; this project is not declared production-ready.
 
-For owner-authorized Vercel deployment through GitHub Actions, see [docs/VERCEL.md](docs/VERCEL.md). Production deployment requires hosted PostgreSQL, private S3 and Vercel/GitHub secrets. The current photo upload path has a documented Vercel request-size limitation.
+For the owner-authorized Vercel deployment, see [docs/VERCEL.md](docs/VERCEL.md). Vercel manages the connected Marketplace database and private Blob store; GitHub Actions secrets are not needed.

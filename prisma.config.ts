@@ -9,7 +9,7 @@ export default defineConfig({
   // CLI generation works before .env exists. Runtime code requires a real URL.
   datasource: {
     url:
-      process.env.DATABASE_URL ??
+      process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL ??
       "postgresql://parcel_dev:parcel_dev_local@localhost:5432/parcel_delivery",
   },
 });

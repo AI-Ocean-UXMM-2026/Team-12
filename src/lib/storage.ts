@@ -8,6 +8,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { mkdir, readFile, writeFile, unlink, access } from "node:fs/promises";
 import path from "node:path";
+import { put, get, del, list } from "@vercel/blob";
 let client: S3Client | undefined;
 export function getStorageClient() {
   if (client) return client;
@@ -50,6 +51,21 @@ function localPath(key: string) {
   return result;
 }
 export function getPrivateStore(): PrivateObjectStore {
+  if (process.env.STORAGE_ADAPTER === "vercel-blob") {
+    return {
+      async put(key, bytes) {
+        await put(key, bytes, { access: "private", addRandomSuffix: false,
+          allowOverwrite: false, contentType: "image/jpeg" });
+      },
+      async get(key) {
+        const blob = await get(key, { access: "private", useCache: false });
+        if (!blob || blob.statusCode !== 200) throw new Error("Private photo unavailable.");
+        return new Uint8Array(await new Response(blob.stream).arrayBuffer());
+      },
+      async remove(key) { await del(key); },
+      async ready() { await list({ prefix: "proof/", limit: 1 }); },
+    };
+  }
   if (process.env.STORAGE_ADAPTER === "filesystem") {
     if (
       process.env.NODE_ENV === "production" &&
