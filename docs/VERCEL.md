@@ -12,7 +12,7 @@ The owner requested Vercel's built-in GitHub integration on 2026-10-23, supersed
 
 ## GitHub deployment flow
 
-Push the application to GitHub, then connect `AI-Ocean-UXMM-2026/Team-12` in Vercel Git settings, with `main` as the production branch. Subsequent pushes build and deploy automatically through Vercel. Removing `git.deploymentEnabled: false` enables native deployments. GitHub Actions no longer gates this flow. Run lint, typecheck and tests before pushing.
+`AI-Ocean-UXMM-2026/Team-12` is connected to Vercel with `main` as the production branch. `git.deploymentEnabled: true` explicitly enables automatic builds on pushes by any repository contributor, not just the project owner. A push to `main` triggers Production; pushes to other branches trigger Preview. The repository is public, so Vercel's private-repository team membership restriction does not apply. Fork pull requests still use Vercel's normal authorization protection. GitHub Actions no longer gates this flow. Run lint, typecheck and tests before pushing.
 
 `build:vercel` generates Prisma, validates configuration, applies committed migrations using `DATABASE_URL_UNPOOLED` when present, optionally provisions the first Admin in an empty installation, and builds Next.js. It never seeds development accounts, resets data or replaces existing credentials. Migrations must remain compatible with the previous running release. A failed build does not undo migrations.
 
